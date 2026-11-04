@@ -1,0 +1,61 @@
+name: Test
+
+on:
+  push:            # any branch + tags
+  pull_request:    # opened / synchronize / reopened
+
+concurrency:
+  # main + tags: unique group per run => never cancelled, never replaced while pending.
+  # branches: refs/heads/<b> (push) and refs/pull/<n>/merge (PR) are different groups,
+  # so a push run can never cancel a PR run (and vice versa).
+  group: ${{ github.workflow }}-${{ (github.ref_type == 'tag' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && github.run_id || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Push runs only: is there an open same-repo PR for this branch? If so, the PR run owns CI.
+  gate:
+    if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name != github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      pull-requests: read
+    outputs:
+      has-pr: ${{ steps.pr.outputs.has-pr }}
+    steps:
+      - id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/pulls" \
+                -f state=open -f head="${GITHUB_REPOSITORY_OWNER}:${GITHUB_REF_NAME}" --jq length)
+          echo "open PRs for ${GITHUB_REF_NAME}: ${n}"
+          if [ "${n}" -gt 0 ]; then echo "has-pr=true" >> "$GITHUB_OUTPUT"; else echo "has-pr=false" >> "$GITHUB_OUTPUT"; fi
+
+  linting:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.has-pr != 'true' }}
+    # Push-path checks get a distinct name so they can never satisfy/mask a required PR check.
+    name: ${{ github.event_name == 'push' && 'push / ' || '' }}linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          sleep 5
+          if [ -f FAIL_LINT ]; then echo "FAIL_LINT present"; exit 1; fi
+
+  functional:
+    needs: gate
+    if: ${{ !cancelled() && needs.gate.outputs.has-pr != 'true' }}
+    name: ${{ github.event_name == 'push' && 'push / ' || '' }}functional (${{ matrix.os }}, ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11"]
+    steps:
+      - run: sleep ${SLEEP:-20}
+        env:
+          SLEEP: ${{ vars.SLEEP }}
