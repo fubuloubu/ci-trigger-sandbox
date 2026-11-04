@@ -38,7 +38,6 @@ jobs:
     needs: gate
     if: ${{ !cancelled() && needs.gate.outputs.has-pr != 'true' }}
     # Push-path checks get a distinct name so they can never satisfy/mask a required PR check.
-    name: ${{ github.event_name == 'push' && 'push / ' || '' }}linting
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -49,7 +48,6 @@ jobs:
   functional:
     needs: gate
     if: ${{ !cancelled() && needs.gate.outputs.has-pr != 'true' }}
-    name: ${{ github.event_name == 'push' && 'push / ' || '' }}functional (${{ matrix.os }}, ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
