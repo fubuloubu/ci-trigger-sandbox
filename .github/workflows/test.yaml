@@ -34,26 +34,22 @@ jobs:
           echo "open PRs for ${GITHUB_REF_NAME}: ${n}"
           if [ "${n}" -gt 0 ]; then echo "has-pr=true" >> "$GITHUB_OUTPUT"; else echo "has-pr=false" >> "$GITHUB_OUTPUT"; fi
 
-  slowpr:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - run: sleep 90
-
   linting:
-    needs: [gate, slowpr]
+    needs: gate
     if: ${{ !cancelled() && needs.gate.outputs.has-pr != 'true' }}
     # Push-path checks get a distinct name so they can never satisfy/mask a required PR check.
+    name: ${{ github.event_name == 'push' && 'push / ' || '' }}linting
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - run: |
-          if [ -f SLOW_LINT ]; then sleep 150; else sleep 5; fi
+          sleep 5
           if [ -f FAIL_LINT ]; then echo "FAIL_LINT present"; exit 1; fi
 
   functional:
     needs: gate
     if: ${{ !cancelled() && needs.gate.outputs.has-pr != 'true' }}
+    name: ${{ github.event_name == 'push' && 'push / ' || '' }}functional (${{ matrix.os }}, ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
