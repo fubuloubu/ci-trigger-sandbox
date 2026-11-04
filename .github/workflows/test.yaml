@@ -34,8 +34,14 @@ jobs:
           echo "open PRs for ${GITHUB_REF_NAME}: ${n}"
           if [ "${n}" -gt 0 ]; then echo "has-pr=true" >> "$GITHUB_OUTPUT"; else echo "has-pr=false" >> "$GITHUB_OUTPUT"; fi
 
+  slowpr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 90
+
   linting:
-    needs: gate
+    needs: [gate, slowpr]
     if: ${{ !cancelled() && needs.gate.outputs.has-pr != 'true' }}
     # Push-path checks get a distinct name so they can never satisfy/mask a required PR check.
     runs-on: ubuntu-latest
