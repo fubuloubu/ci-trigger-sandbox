@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: |
-          sleep 5
+          if [ -f SLOW_LINT ]; then sleep 150; else sleep 5; fi
           if [ -f FAIL_LINT ]; then echo "FAIL_LINT present"; exit 1; fi
 
   functional:
